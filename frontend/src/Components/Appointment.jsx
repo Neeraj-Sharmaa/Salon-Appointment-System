@@ -114,6 +114,7 @@
 
 import { useState } from "react";
 import "./Appointment.css";
+import API_BASE_URL from "../config/api";
 
 const Appointment = () => {
   const [name, setName] = useState("");
@@ -129,7 +130,7 @@ const Appointment = () => {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/appointments",
+        `${API_BASE_URL}/appointments`,
         {
           method: "POST",
           headers: {

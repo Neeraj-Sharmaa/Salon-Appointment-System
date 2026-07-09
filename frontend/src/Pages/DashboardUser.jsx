@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../Components/Navbar";
 import Footer from "../Components/Footer";
+import API_BASE_URL from "../config/api";
 
 const DashboardUser = () => {
   const { user, loading } = useAuth();
@@ -27,7 +28,7 @@ const DashboardUser = () => {
   const fetchAppointments = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:5000/appointments/my", {
+      const response = await fetch(`${API_BASE_URL}/appointments/my`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -55,7 +56,7 @@ const DashboardUser = () => {
     setBookingError("");
 
     try {
-      const response = await fetch("http://localhost:5000/appointments", {
+      const response = await fetch(`${API_BASE_URL}/appointments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

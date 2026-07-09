@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect, useContext } from "react";
+import API_BASE_URL from "../config/api";
 
 const AuthContext = createContext();
 
@@ -17,7 +18,7 @@ export const AuthProvider = ({ children }) => {
           setUser(JSON.parse(storedUser));
           
           // Verify with backend
-          const response = await fetch("http://localhost:5000/auth/me", {
+          const response = await fetch(`${API_BASE_URL}/auth/me`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -43,7 +44,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
-    const response = await fetch("http://localhost:5000/auth/login", {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -65,7 +66,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signup = async (signupData) => {
-    const response = await fetch("http://localhost:5000/auth/signup", {
+    const response = await fetch(`${API_BASE_URL}/auth/signup`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -87,7 +88,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const googleSignIn = async (authData) => {
-    const response = await fetch("http://localhost:5000/auth/google", {
+    const response = await fetch(`${API_BASE_URL}/auth/google`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

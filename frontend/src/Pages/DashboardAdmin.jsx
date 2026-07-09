@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../Components/Navbar";
 import Footer from "../Components/Footer";
+import API_BASE_URL from "../config/api";
 
 const DashboardAdmin = () => {
   const { user, loading } = useAuth();
@@ -24,7 +25,7 @@ const DashboardAdmin = () => {
       const token = localStorage.getItem("token");
 
       // Fetch appointments
-      const apptRes = await fetch("http://localhost:5000/appointments", {
+      const apptRes = await fetch(`${API_BASE_URL}/appointments`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -35,7 +36,7 @@ const DashboardAdmin = () => {
       }
 
       // Fetch professionals
-      const profRes = await fetch("http://localhost:5000/auth/professionals", {
+      const profRes = await fetch(`${API_BASE_URL}/auth/professionals`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -63,7 +64,7 @@ const DashboardAdmin = () => {
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:5000/appointments/${id}/status`, {
+      const response = await fetch(`${API_BASE_URL}/appointments/${id}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -91,7 +92,7 @@ const DashboardAdmin = () => {
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:5000/appointments/${apptId}/assign`, {
+      const response = await fetch(`${API_BASE_URL}/appointments/${apptId}/assign`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

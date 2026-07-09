@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../Components/Navbar";
 import Footer from "../Components/Footer";
+import API_BASE_URL from "../config/api";
 
 const DashboardProfessional = () => {
   const { user, loading } = useAuth();
@@ -21,7 +22,7 @@ const DashboardProfessional = () => {
   const fetchAppointments = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:5000/appointments/professional", {
+      const response = await fetch(`${API_BASE_URL}/appointments/professional`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -49,7 +50,7 @@ const DashboardProfessional = () => {
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://localhost:5000/appointments/${id}/status`, {
+      const response = await fetch(`${API_BASE_URL}/appointments/${id}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
