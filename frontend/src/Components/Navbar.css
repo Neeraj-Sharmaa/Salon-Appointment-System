@@ -1,0 +1,8 @@
+.logo_img {
+  width: 50px;
+  height: auto;
+}
+
+.mobile-nav-link {
+  transition: all 0.3s ease;
+}

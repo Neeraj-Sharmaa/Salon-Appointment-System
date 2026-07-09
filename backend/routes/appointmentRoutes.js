@@ -1,0 +1,152 @@
+const express = require("express");
+const router = express.Router();
+const Appointment = require("../models/Appointment");
+const { protect, authorizeRoles } = require("../middleware/authMiddleware");
+
+// @desc    Get all appointments (Admin only)
+// @route   GET /appointments
+// @access  Private/Admin
+router.get("/", protect, authorizeRoles("admin"), async (req, res) => {
+  try {
+    const appointments = await Appointment.find()
+      .populate("user", "name email phone")
+      .populate("professional", "name email specialization")
+      .sort({ createdAt: -1 });
+    res.json(appointments);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Get user's appointments
+// @route   GET /appointments/my
+// @access  Private
+router.get("/my", protect, async (req, res) => {
+  try {
+    const appointments = await Appointment.find({ user: req.user._id })
+      .populate("professional", "name email specialization")
+      .sort({ createdAt: -1 });
+    res.json(appointments);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Get professional's appointments
+// @route   GET /appointments/professional
+// @access  Private/Professional
+router.get(
+  "/professional",
+  protect,
+  authorizeRoles("professional", "admin"),
+  async (req, res) => {
+    try {
+      const appointments = await Appointment.find({
+        professional: req.user._id,
+      })
+        .populate("user", "name email phone")
+        .sort({ createdAt: -1 });
+      res.json(appointments);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+// @desc    Create appointment (Public or Logged in User)
+// @route   POST /appointments
+// @access  Public
+router.post("/", async (req, res) => {
+  try {
+    const { name, email, phone, service, date, time, message, userId } = req.body;
+
+    const appointmentData = {
+      name,
+      email,
+      phone,
+      service,
+      date,
+      time,
+      message,
+    };
+
+    // If userId is provided, associate it
+    if (userId) {
+      appointmentData.user = userId;
+    }
+
+    const appointment = new Appointment(appointmentData);
+    await appointment.save();
+
+    res.status(201).json({
+      message: "Appointment booked successfully",
+      appointment,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Update appointment status
+// @route   PUT /appointments/:id/status
+// @access  Private/Admin or Professional
+router.put("/:id/status", protect, async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    if (!["pending", "confirmed", "completed", "cancelled"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+
+    const appointment = await Appointment.findById(req.params.id);
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    // Professionals can only modify appointments assigned to them, Admins can modify any
+    if (
+      req.user.role === "professional" &&
+      appointment.professional.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        message: "Not authorized to update status of this appointment",
+      });
+    }
+
+    appointment.status = status;
+    await appointment.save();
+
+    res.json({ message: `Appointment status updated to ${status}`, appointment });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Assign stylist to appointment (Admin only)
+// @route   PUT /appointments/:id/assign
+// @access  Private/Admin
+router.put("/:id/assign", protect, authorizeRoles("admin"), async (req, res) => {
+  try {
+    const { professionalId } = req.body;
+
+    const appointment = await Appointment.findById(req.params.id);
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    appointment.professional = professionalId || null;
+    await appointment.save();
+
+    const updatedAppt = await Appointment.findById(req.params.id)
+      .populate("professional", "name email specialization")
+      .populate("user", "name email phone");
+
+    res.json({ message: "Stylist assigned successfully", appointment: updatedAppt });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+module.exports = router;
