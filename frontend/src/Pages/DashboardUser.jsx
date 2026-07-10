@@ -76,7 +76,7 @@ const DashboardUser = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setBookingSuccess("Appointment booked successfully!");
+        setBookingSuccess("Your appointment request has been received and is currently under review. We will confirm it shortly!");
         setService("");
         setDate("");
         setTime("");

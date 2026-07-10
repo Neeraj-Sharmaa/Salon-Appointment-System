@@ -94,7 +94,7 @@ router.post("/", async (req, res) => {
     });
 
     res.status(201).json({
-      message: "Appointment booked successfully",
+      message: "Your appointment request has been received and is currently under review. We will confirm it shortly!",
       appointment,
     });
   } catch (error) {
