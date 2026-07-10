@@ -2,6 +2,7 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
+const { sendWelcomeEmail } = require("../utils/emailService");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -46,6 +47,11 @@ const registerUser = async (req, res) => {
     });
 
     if (user) {
+      // Send welcome email asynchronously
+      sendWelcomeEmail(user.email, user.name).catch(err => {
+        console.error("Failed to send welcome email:", err);
+      });
+
       res.status(201).json({
         _id: user._id,
         name: user.name,
@@ -212,6 +218,11 @@ const googleLogin = async (req, res) => {
         avatar: picture || "",
         authProvider: "google",
         role: role || "user", // Support custom role on signup
+      });
+
+      // Send welcome email asynchronously
+      sendWelcomeEmail(user.email, user.name).catch(err => {
+        console.error("Failed to send welcome email:", err);
       });
     }
 

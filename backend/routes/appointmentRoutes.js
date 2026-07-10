@@ -2,6 +2,13 @@ const express = require("express");
 const router = express.Router();
 const Appointment = require("../models/Appointment");
 const { protect, authorizeRoles } = require("../middleware/authMiddleware");
+const {
+  sendAppointmentCreatedEmail,
+  sendAdminNotificationEmail,
+  sendStatusUpdateEmail,
+  sendStylistAssignedEmail,
+  sendStylistNotificationEmail
+} = require("../utils/emailService");
 
 // @desc    Get all appointments (Admin only)
 // @route   GET /appointments
@@ -78,6 +85,14 @@ router.post("/", async (req, res) => {
     const appointment = new Appointment(appointmentData);
     await appointment.save();
 
+    // Trigger emails asynchronously
+    sendAppointmentCreatedEmail(appointment).catch(err => {
+      console.error("Failed to send client booking confirmation email:", err);
+    });
+    sendAdminNotificationEmail(appointment).catch(err => {
+      console.error("Failed to send admin booking notification email:", err);
+    });
+
     res.status(201).json({
       message: "Appointment booked successfully",
       appointment,
@@ -117,6 +132,11 @@ router.put("/:id/status", protect, async (req, res) => {
     appointment.status = status;
     await appointment.save();
 
+    // Trigger status update email asynchronously
+    sendStatusUpdateEmail(appointment).catch(err => {
+      console.error("Failed to send status update email:", err);
+    });
+
     res.json({ message: `Appointment status updated to ${status}`, appointment });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -142,6 +162,16 @@ router.put("/:id/assign", protect, authorizeRoles("admin"), async (req, res) => 
     const updatedAppt = await Appointment.findById(req.params.id)
       .populate("professional", "name email specialization")
       .populate("user", "name email phone");
+
+    // Trigger stylist assignment emails asynchronously if a stylist was assigned
+    if (updatedAppt.professional) {
+      sendStylistAssignedEmail(updatedAppt, updatedAppt.professional).catch(err => {
+        console.error("Failed to send stylist assignment email to client:", err);
+      });
+      sendStylistNotificationEmail(updatedAppt, updatedAppt.professional).catch(err => {
+        console.error("Failed to send job notification email to stylist:", err);
+      });
+    }
 
     res.json({ message: "Stylist assigned successfully", appointment: updatedAppt });
   } catch (error) {
