@@ -474,6 +474,30 @@ const sendStylistNotificationEmail = async (appointment, professional) => {
   });
 };
 
+// Send OTP Verification Email
+const sendOtpEmail = async (email, name, otp) => {
+  const senderEmail = process.env.BREVO_SENDER_EMAIL || "neerudevgan13@gmail.com";
+  const content = `
+    <h2>Verify Your Email Address</h2>
+    <p>Hello <strong>${name}</strong>,</p>
+    <p>Thank you for registering with the <strong>Salon Appointment System</strong>. To complete your registration and create your account, please verify your email address using the 6-digit One-Time Password (OTP) below:</p>
+    
+    <div style="text-align: center; margin: 30px 0;">
+      <div style="display: inline-block; background-color: #fafbfc; border: 2px dashed #d4af37; padding: 15px 40px; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #1e1e2f; border-radius: 8px;">
+        ${otp}
+      </div>
+    </div>
+
+    <p style="color: #666666; font-size: 14px; text-align: center;">This verification code is valid for <strong>10 minutes</strong>. Please do not share this OTP with anyone.</p>
+    <p>If you did not request this code, you can safely ignore this email.</p>
+  `;
+  return sendEmail({
+    to: email,
+    subject: `Email Verification OTP: ${otp} - Salon Appointment System`,
+    htmlContent: getEmailWrapper(content, senderEmail)
+  });
+};
+
 module.exports = {
   sendEmail,
   sendWelcomeEmail,
@@ -481,5 +505,6 @@ module.exports = {
   sendAdminNotificationEmail,
   sendStatusUpdateEmail,
   sendStylistAssignedEmail,
-  sendStylistNotificationEmail
+  sendStylistNotificationEmail,
+  sendOtpEmail
 };

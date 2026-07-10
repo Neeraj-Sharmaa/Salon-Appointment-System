@@ -7,11 +7,13 @@ const {
   getUserProfile,
   getProfessionals,
   getAllUsers,
+  sendOTP,
 } = require("../controllers/authController");
 const { protect, authorizeRoles } = require("../middleware/authMiddleware");
 
 // Public routes
 router.post("/signup", registerUser);
+router.post("/send-otp", sendOTP);
 router.post("/login", loginUser);
 router.post("/google", googleLogin);
 router.get("/professionals", getProfessionals);

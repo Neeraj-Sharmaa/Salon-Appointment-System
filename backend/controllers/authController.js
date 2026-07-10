@@ -2,7 +2,8 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
-const { sendWelcomeEmail } = require("../utils/emailService");
+const OTP = require("../models/OTP");
+const { sendWelcomeEmail, sendOtpEmail } = require("../utils/emailService");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -20,16 +21,22 @@ const generateToken = (id) => {
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role, specialization, experience } = req.body;
+    const { name, email, password, role, specialization, experience, otp } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "Please enter all required fields" });
+    if (!name || !email || !password || !otp) {
+      return res.status(400).json({ message: "Please enter all required fields including verification code" });
     }
 
     // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: "User already exists with this email" });
+    }
+
+    // Verify OTP code
+    const otpRecord = await OTP.findOne({ email, otp });
+    if (!otpRecord) {
+      return res.status(400).json({ message: "Invalid or expired verification code" });
     }
 
     // Hash password
@@ -47,6 +54,9 @@ const registerUser = async (req, res) => {
     });
 
     if (user) {
+      // Delete used OTP record
+      await OTP.deleteOne({ _id: otpRecord._id });
+
       // Send welcome email asynchronously
       sendWelcomeEmail(user.email, user.name).catch(err => {
         console.error("Failed to send welcome email:", err);
@@ -243,6 +253,48 @@ const googleLogin = async (req, res) => {
   }
 };
 
+// @desc    Generate and send OTP for email verification
+// @route   POST /auth/send-otp
+// @access  Public
+const sendOTP = async (req, res) => {
+  try {
+    const { email, name } = req.body;
+
+    if (!email || !name) {
+      return res.status(400).json({ message: "Please provide email and name" });
+    }
+
+    // Check if user already exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: "User already exists with this email" });
+    }
+
+    // Generate 6-digit OTP code
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store in database (overwrite previous OTPs for this email)
+    await OTP.findOneAndUpdate(
+      { email },
+      { otp, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+
+    // Send OTP email
+    const emailResult = await sendOtpEmail(email, name, otp);
+
+    if (emailResult.success) {
+      res.status(200).json({ message: "Verification OTP code sent to your email" });
+    } else {
+      console.error("Failed to send OTP email via Brevo:", emailResult.error);
+      res.status(500).json({ message: "Failed to send verification email. Please try again." });
+    }
+  } catch (error) {
+    console.error("Send OTP Error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -250,4 +302,5 @@ module.exports = {
   getProfessionals,
   getAllUsers,
   googleLogin,
+  sendOTP,
 };

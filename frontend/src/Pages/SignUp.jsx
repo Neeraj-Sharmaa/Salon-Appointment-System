@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Mail, Lock, Eye, EyeOff, Sparkles, Sun, Moon, User, Scissors, Briefcase } from "lucide-react";
+import API_BASE_URL from "../config/api";
 
 const SignUp = () => {
   const [name, setName] = useState("");
@@ -14,6 +15,19 @@ const SignUp = () => {
   const [darkMode, setDarkMode] = useState(true); // Default to Dark mode for luxury look
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // OTP Verification States
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [countdown, setCountdown] = useState(0);
+
+  // Handle countdown timer for OTP resend
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
   // Password Strength State
   const [passwordStrength, setPasswordStrength] = useState(0); // 0 to 4
@@ -54,32 +68,85 @@ const SignUp = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
 
-    try {
-      // Mock loading state for 1 second to showcase the luxury transition animation
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      const signupData = {
-        name,
-        email,
-        password,
-        role,
-        specialization: role === "professional" ? specialization : undefined,
-        experience: role === "professional" ? Number(experience) : undefined,
-      };
-
-      const user = await signup(signupData);
-      
-      if (user.role === "admin") {
-        navigate("/dashboard-admin");
-      } else if (user.role === "professional") {
-        navigate("/dashboard-professional");
-      } else {
-        navigate("/dashboard-user");
+    if (!otpSent) {
+      // Step 1: Send OTP
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/send-otp`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, name }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to send verification code");
+        }
+        setOtpSent(true);
+        setCountdown(60);
+      } catch (err) {
+        setError(err.message || "Something went wrong sending verification code.");
+      } finally {
+        setLoading(false);
       }
+    } else {
+      // Step 2: Verify & Sign Up
+      if (!otp || otp.length !== 6) {
+        setError("Please enter a valid 6-digit verification code.");
+        return;
+      }
+      setLoading(true);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
+        const signupData = {
+          name,
+          email,
+          password,
+          role,
+          specialization: role === "professional" ? specialization : undefined,
+          experience: role === "professional" ? Number(experience) : undefined,
+          otp,
+        };
+
+        const user = await signup(signupData);
+        
+        if (user.role === "admin") {
+          navigate("/dashboard-admin");
+        } else if (user.role === "professional") {
+          navigate("/dashboard-professional");
+        } else {
+          navigate("/dashboard-user");
+        }
+      } catch (err) {
+        setError(err.message || "Something went wrong during sign up.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/send-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, name }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to resend code");
+      }
+      setCountdown(60);
+      setOtp("");
     } catch (err) {
-      setError(err.message || "Something went wrong during sign up.");
+      setError(err.message || "Failed to resend verification code.");
     } finally {
       setLoading(false);
     }
@@ -284,242 +351,310 @@ const SignUp = () => {
           )}
 
           <form className="space-y-4" onSubmit={handleSubmit}>
-            
-            {/* Role Selection Slider */}
-            <div>
-              <label className={`block text-[10px] tracking-widest font-bold uppercase mb-2 ${
-                darkMode ? "text-gray-400" : "text-gray-600"
-              }`}>
-                Identify Your Role
-              </label>
-              <div className={`p-1 rounded-xl border flex relative ${
-                darkMode ? "bg-[#18161e] border-gray-800" : "bg-[#FAF8F5] border-[#EBE5DA]"
-              }`}>
-                <button
-                  type="button"
-                  onClick={() => setRole("user")}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg text-center transition-all duration-300 relative z-10 cursor-pointer ${
-                    role === "user" 
-                      ? "text-white" 
-                      : darkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Client
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole("professional")}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg text-center transition-all duration-300 relative z-10 cursor-pointer ${
-                    role === "professional" 
-                      ? "text-white" 
-                      : darkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Stylist
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole("admin")}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg text-center transition-all duration-300 relative z-10 cursor-pointer ${
-                    role === "admin" 
-                      ? "text-white" 
-                      : darkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Admin
-                </button>
-                {/* Sliding Indicator */}
-                <div
-                  className="absolute top-1 bottom-1 bg-[#C88E81] rounded-lg transition-all duration-300 ease-out"
-                  style={{
-                    left: role === "user" ? "4px" : role === "professional" ? "34.5%" : "67.5%",
-                    width: "31%",
-                  }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Full Name */}
-            <div className="space-y-1">
-              <label className={`block text-[10px] tracking-widest font-bold uppercase ${
-                darkMode ? "text-gray-400" : "text-gray-600"
-              }`}>
-                Full Name
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
-                  <User size={16} />
-                </span>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={`w-full rounded-xl pl-10 pr-4 py-3.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#C88E81] transition duration-300 ${
-                    darkMode
-                      ? "bg-[#18161e] border-gray-800 text-white placeholder-gray-600 focus:border-[#C88E81]"
-                      : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-800 placeholder-gray-400 focus:border-[#C88E81]"
-                  }`}
-                  placeholder="John Doe"
-                />
-              </div>
-            </div>
-
-            {/* Email Address */}
-            <div className="space-y-1">
-              <label className={`block text-[10px] tracking-widest font-bold uppercase ${
-                darkMode ? "text-gray-400" : "text-gray-600"
-              }`}>
-                Email Address
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
-                  <Mail size={16} />
-                </span>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={`w-full rounded-xl pl-10 pr-4 py-3.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#C88E81] transition duration-300 ${
-                    darkMode
-                      ? "bg-[#18161e] border-gray-800 text-white placeholder-gray-600 focus:border-[#C88E81]"
-                      : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-800 placeholder-gray-400 focus:border-[#C88E81]"
-                  }`}
-                  placeholder="name@domain.com"
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div className="space-y-1">
-              <label className={`block text-[10px] tracking-widest font-bold uppercase ${
-                darkMode ? "text-gray-400" : "text-gray-600"
-              }`}>
-                Password
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
-                  <Lock size={16} />
-                </span>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full rounded-xl pl-10 pr-10 py-3.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#C88E81] transition duration-300 ${
-                    darkMode
-                      ? "bg-[#18161e] border-gray-800 text-white placeholder-gray-600 focus:border-[#C88E81]"
-                      : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-800 placeholder-gray-400 focus:border-[#C88E81]"
-                  }`}
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-500 hover:text-gray-300 transition cursor-pointer"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-
-              {/* Password Strength Indicator */}
-              {password && (
-                <div className="space-y-1.5 pt-1.5 animate-fadeIn">
-                  <div className="flex justify-between items-center text-[10px] font-bold">
-                    <span className={darkMode ? "text-gray-400" : "text-gray-500"}>Strength</span>
-                    <span
-                      style={{
-                        color:
-                          passwordStrength <= 1
-                            ? "#EF4444"
-                            : passwordStrength === 2
-                            ? "#F59E0B"
-                            : "#10B981",
-                      }}
-                    >
-                      {strengthLabel}
-                    </span>
-                  </div>
-                  <div className={`h-[4px] w-full rounded-full flex gap-1 ${
-                    darkMode ? "bg-gray-800" : "bg-gray-200"
-                  }`}>
-                    {[...Array(4)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="h-full flex-1 rounded-full transition-all duration-300"
-                        style={{
-                          backgroundColor:
-                            i < passwordStrength
-                              ? passwordStrength <= 1
-                                ? "#EF4444"
-                                : passwordStrength === 2
-                                ? "#F59E0B"
-                                : "#10B981"
-                              : "transparent",
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Stylist Details (Dynamic) */}
-            {role === "professional" && (
-              <div className="space-y-4 pt-3 border-t border-gray-800/40 animate-fadeIn">
-                <div className="space-y-1">
-                  <label className={`block text-[10px] tracking-widest font-bold uppercase ${
+            {!otpSent ? (
+              <>
+                {/* Role Selection Slider */}
+                <div>
+                  <label className={`block text-[10px] tracking-widest font-bold uppercase mb-2 ${
                     darkMode ? "text-gray-400" : "text-gray-600"
                   }`}>
-                    Specialty Focus
+                    Identify Your Role
                   </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
-                      <Scissors size={16} />
-                    </span>
-                    <select
-                      required={role === "professional"}
-                      value={specialization}
-                      onChange={(e) => setSpecialization(e.target.value)}
-                      className={`w-full rounded-xl pl-10 pr-4 py-3.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#C88E81] transition duration-300 ${
-                        darkMode
-                          ? "bg-[#18161e] border-gray-800 text-white focus:border-[#C88E81]"
-                          : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-800 focus:border-[#C88E81]"
+                  <div className={`p-1 rounded-xl border flex relative ${
+                    darkMode ? "bg-[#18161e] border-gray-800" : "bg-[#FAF8F5] border-[#EBE5DA]"
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => setRole("user")}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg text-center transition-all duration-300 relative z-10 cursor-pointer ${
+                        role === "user" 
+                          ? "text-white" 
+                          : darkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      <option value="" className="bg-[#0b0a0f]">Select Specialty...</option>
-                      <option value="Hair Styling" className="bg-[#0b0a0f]">Hair Styling</option>
-                      <option value="Hair Coloring" className="bg-[#0b0a0f]">Hair Coloring</option>
-                      <option value="Spa Treatment" className="bg-[#0b0a0f]">Spa Treatment</option>
-                      <option value="Bridal Makeup" className="bg-[#0b0a0f]">Bridal Makeup</option>
-                    </select>
+                      Client
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole("professional")}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg text-center transition-all duration-300 relative z-10 cursor-pointer ${
+                        role === "professional" 
+                          ? "text-white" 
+                          : darkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Stylist
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole("admin")}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg text-center transition-all duration-300 relative z-10 cursor-pointer ${
+                        role === "admin" 
+                          ? "text-white" 
+                          : darkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Admin
+                    </button>
+                    {/* Sliding Indicator */}
+                    <div
+                      className="absolute top-1 bottom-1 bg-[#C88E81] rounded-lg transition-all duration-300 ease-out"
+                      style={{
+                        left: role === "user" ? "4px" : role === "professional" ? "34.5%" : "67.5%",
+                        width: "31%",
+                      }}
+                    ></div>
                   </div>
                 </div>
 
+                {/* Full Name */}
                 <div className="space-y-1">
                   <label className={`block text-[10px] tracking-widest font-bold uppercase ${
                     darkMode ? "text-gray-400" : "text-gray-600"
                   }`}>
-                    Experience (Years)
+                    Full Name
                   </label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
-                      <Briefcase size={16} />
+                      <User size={16} />
                     </span>
                     <input
-                      type="number"
-                      required={role === "professional"}
-                      min="0"
-                      value={experience}
-                      onChange={(e) => setExperience(e.target.value)}
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
                       className={`w-full rounded-xl pl-10 pr-4 py-3.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#C88E81] transition duration-300 ${
                         darkMode
                           ? "bg-[#18161e] border-gray-800 text-white placeholder-gray-600 focus:border-[#C88E81]"
                           : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-800 placeholder-gray-400 focus:border-[#C88E81]"
                       }`}
-                      placeholder="e.g. 5"
+                      placeholder="John Doe"
                     />
+                  </div>
+                </div>
+
+                {/* Email Address */}
+                <div className="space-y-1">
+                  <label className={`block text-[10px] tracking-widest font-bold uppercase ${
+                    darkMode ? "text-gray-400" : "text-gray-600"
+                  }`}>
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                      <Mail size={16} />
+                    </span>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`w-full rounded-xl pl-10 pr-4 py-3.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#C88E81] transition duration-300 ${
+                        darkMode
+                          ? "bg-[#18161e] border-gray-800 text-white placeholder-gray-600 focus:border-[#C88E81]"
+                          : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-800 placeholder-gray-400 focus:border-[#C88E81]"
+                      }`}
+                      placeholder="name@domain.com"
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div className="space-y-1">
+                  <label className={`block text-[10px] tracking-widest font-bold uppercase ${
+                    darkMode ? "text-gray-400" : "text-gray-600"
+                  }`}>
+                    Password
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                      <Lock size={16} />
+                    </span>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={`w-full rounded-xl pl-10 pr-10 py-3.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#C88E81] transition duration-300 ${
+                        darkMode
+                          ? "bg-[#18161e] border-gray-800 text-white placeholder-gray-600 focus:border-[#C88E81]"
+                          : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-800 placeholder-gray-400 focus:border-[#C88E81]"
+                      }`}
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-500 hover:text-gray-300 transition cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+
+                  {/* Password Strength Indicator */}
+                  {password && (
+                    <div className="space-y-1.5 pt-1.5 animate-fadeIn">
+                      <div className="flex justify-between items-center text-[10px] font-bold">
+                        <span className={darkMode ? "text-gray-400" : "text-gray-500"}>Strength</span>
+                        <span
+                          style={{
+                            color:
+                              passwordStrength <= 1
+                                ? "#EF4444"
+                                : passwordStrength === 2
+                                ? "#F59E0B"
+                                : "#10B981",
+                          }}
+                        >
+                          {strengthLabel}
+                        </span>
+                      </div>
+                      <div className={`h-[4px] w-full rounded-full flex gap-1 ${
+                        darkMode ? "bg-gray-800" : "bg-gray-200"
+                      }`}>
+                        {[...Array(4)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="h-full flex-1 rounded-full transition-all duration-300"
+                            style={{
+                              backgroundColor:
+                                i < passwordStrength
+                                  ? passwordStrength <= 1
+                                    ? "#EF4444"
+                                    : passwordStrength === 2
+                                    ? "#F59E0B"
+                                    : "#10B981"
+                                  : "transparent",
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Stylist Details (Dynamic) */}
+                {role === "professional" && (
+                  <div className="space-y-4 pt-3 border-t border-gray-800/40 animate-fadeIn">
+                    <div className="space-y-1">
+                      <label className={`block text-[10px] tracking-widest font-bold uppercase ${
+                        darkMode ? "text-gray-400" : "text-gray-600"
+                      }`}>
+                        Specialty Focus
+                      </label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                          <Scissors size={16} />
+                        </span>
+                        <select
+                          required={role === "professional"}
+                          value={specialization}
+                          onChange={(e) => setSpecialization(e.target.value)}
+                          className={`w-full rounded-xl pl-10 pr-4 py-3.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#C88E81] transition duration-300 ${
+                            darkMode
+                              ? "bg-[#18161e] border-gray-800 text-white focus:border-[#C88E81]"
+                              : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-800 focus:border-[#C88E81]"
+                          }`}
+                        >
+                          <option value="" className="bg-[#0b0a0f]">Select Specialty...</option>
+                          <option value="Hair Styling" className="bg-[#0b0a0f]">Hair Styling</option>
+                          <option value="Hair Coloring" className="bg-[#0b0a0f]">Hair Coloring</option>
+                          <option value="Spa Treatment" className="bg-[#0b0a0f]">Spa Treatment</option>
+                          <option value="Bridal Makeup" className="bg-[#0b0a0f]">Bridal Makeup</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className={`block text-[10px] tracking-widest font-bold uppercase ${
+                        darkMode ? "text-gray-400" : "text-gray-600"
+                      }`}>
+                        Experience (Years)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                          <Briefcase size={16} />
+                        </span>
+                        <input
+                          type="number"
+                          required={role === "professional"}
+                          min="0"
+                          value={experience}
+                          onChange={(e) => setExperience(e.target.value)}
+                          className={`w-full rounded-xl pl-10 pr-4 py-3.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#C88E81] transition duration-300 ${
+                            darkMode
+                              ? "bg-[#18161e] border-gray-800 text-white placeholder-gray-600 focus:border-[#C88E81]"
+                              : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-800 placeholder-gray-400 focus:border-[#C88E81]"
+                          }`}
+                          placeholder="e.g. 5"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="text-center py-2">
+                  <div className={`text-xs ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                    We have sent a 6-digit verification code to
+                  </div>
+                  <div className={`text-sm font-bold mt-1 ${darkMode ? "text-[#C88E81]" : "text-[#b87669]"}`}>
+                    {email}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className={`block text-[10px] tracking-widest font-bold uppercase ${
+                    darkMode ? "text-gray-400" : "text-gray-600"
+                  }`}>
+                    Verification Code
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
+                      <Lock size={16} />
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      maxLength={6}
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                      className={`w-full rounded-xl pl-10 pr-4 py-3.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#C88E81] tracking-[0.5em] text-center transition duration-300 ${
+                        darkMode
+                          ? "bg-[#18161e] border-gray-800 text-white placeholder-gray-600 focus:border-[#C88E81]"
+                          : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-800 placeholder-gray-400 focus:border-[#C88E81]"
+                      }`}
+                      placeholder="••••••"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-xs pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setOtpSent(false)}
+                    className={`font-semibold hover:underline flex items-center gap-1 transition ${
+                      darkMode ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    ← Edit Info
+                  </button>
+
+                  <div>
+                    {countdown > 0 ? (
+                      <span className={darkMode ? "text-gray-500" : "text-gray-400"}>
+                        Resend in {countdown}s
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        className="font-bold text-[#C88E81] hover:text-[#d69f93] transition underline decoration-[#C88E81]/30 hover:decoration-[#C88E81]"
+                      >
+                        Resend Code
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -553,41 +688,44 @@ const SignUp = () => {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Creating account...
+                    {otpSent ? "Verifying..." : "Sending Code..."}
                   </>
                 ) : (
-                  "Register"
+                  otpSent ? "Verify & Create Account" : "Send Verification Code"
                 )}
               </button>
             </div>
 
-            {/* Divider line */}
-            <div className="relative flex items-center justify-center my-2 text-[10px] tracking-wider uppercase font-bold text-gray-500">
-              <div className="flex-grow border-t border-gray-800/40"></div>
-              <span className="px-3">or continue with</span>
-              <div className="flex-grow border-t border-gray-800/40"></div>
-            </div>
+            {/* Divider and Google Sign In */}
+            {!otpSent && (
+              <>
+                <div className="relative flex items-center justify-center my-2 text-[10px] tracking-wider uppercase font-bold text-gray-500">
+                  <div className="flex-grow border-t border-gray-800/40"></div>
+                  <span className="px-3">or continue with</span>
+                  <div className="flex-grow border-t border-gray-800/40"></div>
+                </div>
 
-            {/* Google Sign In */}
-            <div>
-              <button
-                type="button"
-                onClick={handleGoogleSignUp}
-                className={`w-full py-3 px-4 rounded-xl border font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:scale-[1.01] transition duration-300 cursor-pointer ${
-                  darkMode
-                    ? "bg-[#18161e] border-gray-800 text-gray-300 hover:text-white"
-                    : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-600 hover:bg-[#FDFBF7]"
-                }`}
-              >
-                <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24">
-                  <path
-                    fill="#EA4335"
-                    d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.213-5.23 4.213-3.555 0-6.437-2.882-6.437-6.437s2.882-6.437 6.437-6.437c1.554 0 2.973.553 4.088 1.472l3.15-3.15C19.117 1.83 15.894 1 12.24 1 5.922 1 1 5.922 1 12s4.922 11 11.24 11c5.96 0 10.96-4.29 10.96-11 0-.743-.075-1.423-.198-2.063H12.24Z"
-                  />
-                </svg>
-                Sign Up with Google
-              </button>
-            </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignUp}
+                    className={`w-full py-3 px-4 rounded-xl border font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:scale-[1.01] transition duration-300 cursor-pointer ${
+                      darkMode
+                        ? "bg-[#18161e] border-gray-800 text-gray-300 hover:text-white"
+                        : "bg-[#FAF8F5] border-[#EBE5DA] text-gray-600 hover:bg-[#FDFBF7]"
+                    }`}
+                  >
+                    <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24">
+                      <path
+                        fill="#EA4335"
+                        d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.213-5.23 4.213-3.555 0-6.437-2.882-6.437-6.437s2.882-6.437 6.437-6.437c1.554 0 2.973.553 4.088 1.472l3.15-3.15C19.117 1.83 15.894 1 12.24 1 5.922 1 1 5.922 1 12s4.922 11 11.24 11c5.96 0 10.96-4.29 10.96-11 0-.743-.075-1.423-.198-2.063H12.24Z"
+                      />
+                    </svg>
+                    Sign Up with Google
+                  </button>
+                </div>
+              </>
+            )}
           </form>
 
           <div className="mt-6 text-center text-xs">
